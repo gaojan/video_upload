@@ -9,6 +9,7 @@ type UploadRecord struct {
 	Title     string `orm:"column(title)" json:"title"`
 	ImgPath   string `orm:"column(img_path)" json:"img_path"`
 	VideoPath string `orm:"column(video_path)" json:"video_path"`
+	Key       string `orm:"column(key)" json:"key"`
 	CreateDt  string `orm:"column(create_dt)" json:"create_dt"`
 }
 
@@ -40,17 +41,6 @@ func AddAdvRecord(adv *AdvRecord) error {
 	return err
 }
 
-//func GetAdvRecordByAdvName(adv string, name float64) (*AdvRecord, error) {
-//	o := orm.NewOrm()
-//
-//	advRecord := &AdvRecord{Adv: adv, Name: name}
-//	err := o.Read(advRecord, "adv", "name")
-//	if err != nil {
-//		return nil, err
-//	}
-//	return advRecord, err
-//}
-
 func GetAdvRecordByAdvName(adv string) (*AdvRecord, error) {
 	o := orm.NewOrm()
 
@@ -62,16 +52,6 @@ func GetAdvRecordByAdvName(adv string) (*AdvRecord, error) {
 	return advRecord, err
 }
 
-//func UpdateAdvRecordByAdvName(adv string, name float64, num int) error {
-//	o := orm.NewOrm()
-//	advRec := new(AdvRecord)
-//	_, err := o.QueryTable(advRec).Filter("adv", adv).Filter("name", name).Update(orm.Params{"num": num})
-//	if err != nil {
-//		return err
-//	}
-//	return nil
-//}
-
 func UpdateAdvRecordByAdvName(adv string, num int) error {
 	o := orm.NewOrm()
 	advRec := new(AdvRecord)
@@ -80,4 +60,14 @@ func UpdateAdvRecordByAdvName(adv string, num int) error {
 		return err
 	}
 	return nil
+}
+
+func GetUploadRecordByKey(key string) (*UploadRecord, error) {
+	o := orm.NewOrm()
+	video := &UploadRecord{Key: key}
+	err := o.Read(video, "key")
+	if err != nil {
+		return nil, err
+	}
+	return video, err
 }

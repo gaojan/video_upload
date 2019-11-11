@@ -7,4 +7,5 @@ import (
 
 func init() {
 	beego.Router("/upload", &controllers.UploadController{})
+	beego.Router("/snsvideodownload", &controllers.VideoDownloadController{})
 }

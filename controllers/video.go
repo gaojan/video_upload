@@ -102,7 +102,8 @@ func (u *UploadController) Post() {
 		u.Ctx.WriteString(fmt.Sprintf("%v", err))
 		return
 	}
-	if videoInfo.Size > 20971520 {
+	maxSize, _ := beego.AppConfig.Int64("maxSize")
+	if videoInfo.Size > maxSize {
 		u.Ctx.WriteString("Video max size cannot exceed 20MB")
 		return
 	}
@@ -137,15 +138,18 @@ func (u *UploadController) Post() {
 	// 封面图片
 	img, imgInfo, err := u.GetFile("img")
 	if imgInfo == nil || err != nil {
-		// 没有上传封面 使用默认封面
-		defaultImgPath := basePath + "/static/default.jpg"
+		// 没有上传封面 使用默认封面 defaultImg
+
+		defaultImgPath := basePath + beego.AppConfig.String("defaultImg")
 		imgPath := path.Join(dirPath, newVideoName+".jpg")
-		w, err := utils.CopyFile(defaultImgPath, imgPath)
-		fmt.Println(w)
-		fmt.Println(err)
+		if _, err := utils.CopyFile(defaultImgPath, imgPath); err != nil {
+			u.Ctx.WriteString("默认封面不存在")
+			return
+		}
 		uploadVideo := models.UploadRecord{
-			ImgPath:   imgPath,
-			VideoPath: videoPath,
+			ImgPath:   strings.Split(imgPath, "/static")[1],
+			VideoPath: strings.Split(videoPath, "/static")[1],
+			Key:       utils.GetRandomString(64),
 			CreateDt:  utils.GetCurrentTime(),
 		}
 
@@ -182,13 +186,14 @@ func (u *UploadController) Post() {
 			u.Ctx.WriteString("封面上传失败")
 			return
 		}
-		uploadVideo := models.UploadRecord{
-			ImgPath:   imgPath,
-			VideoPath: videoPath,
-			CreateDt:  utils.GetCurrentTime(),
-		}
 
 		// 保存上传记录
+		uploadVideo := models.UploadRecord{
+			ImgPath:   "/static" + strings.Split(imgPath, "/static")[1],
+			VideoPath: "/static" + strings.Split(videoPath, "/static")[1],
+			Key:       utils.GetRandomString(64),
+			CreateDt:  utils.GetCurrentTime(),
+		}
 		if err := models.AddUploadRecord(&uploadVideo); err != nil {
 			u.Ctx.WriteString("Save Database Filed")
 			return
@@ -201,8 +206,43 @@ func (u *UploadController) Post() {
 			u.Ctx.WriteString("Struct to map error")
 			return
 		}
+
+		respMap["video_path"] = "/snsvideodownload?filekey=" + respMap["key"].(string)
 		respMap["num"] = num
 		u.Data["json"] = respMap
 		u.ServeJSON()
+	}
+}
+
+type VideoDownloadController struct {
+	beego.Controller
+}
+
+func (u *VideoDownloadController) Get() {
+	fileKey := u.GetString("filekey")
+	if fileKey == "" {
+		u.Ctx.WriteString("filekey参数不能为空")
+		return
+	}
+	video, err := models.GetUploadRecordByKey(fileKey)
+	if err != nil {
+		u.Ctx.WriteString("Video doesn't exist")
+		return
+	}
+	videoPath := u.Ctx.Request.Host + video.VideoPath
+	html := fmt.Sprintf("<html><head><title>Title</title><video src='http://%s' controls='controls'></video></head><body></body></html>", videoPath)
+	u.Ctx.WriteString(html)
+	return
+}
+
+type AdvController struct {
+	beego.Controller
+}
+
+func (u *AdvController) Post() {
+	adv := u.GetString("adv")
+	if adv == "" {
+		u.Ctx.WriteString("adv参数不能为空")
+		return
 	}
 }
