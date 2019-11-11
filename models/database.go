@@ -17,7 +17,6 @@ var (
 
 func RegisterMsql() {
 	dataSource := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8", dbUser, dbPassword, dbHost, dbPort, dbName)
-	fmt.Println(dataSource)
 	orm.RegisterModel(new(AdvRecord), new(UploadRecord))
 	orm.RegisterDataBase("default", "mysql", dataSource, 30)
 }

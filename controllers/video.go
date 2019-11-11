@@ -17,84 +17,86 @@ type UploadController struct {
 
 func (u *UploadController) Post() {
 
-	adv := u.GetString("adv")
-	if adv == "" {
+	advNo := u.GetString("adv_no")
+	if advNo == "" {
 		u.Ctx.WriteString("adv参数不能为空")
 		return
 	}
 
 	// 获取设备信息
 	var data = make(map[string]string)
-	data["regadv"] = adv
+	data["regadv"] = advNo
 	req := &utils.RequestInfo{
 		Url:           beego.AppConfig.String("aut_url"),
 		Data:          data,
 		DataInterface: nil,
 	}
-
 	resp, err := req.PostUrlEncoded()
 	if err != nil {
 		u.Ctx.WriteString("获取adv错误")
 		return
 	}
 
+	// 解析返回值
 	respBody := make([]map[string]interface{}, 1)
 	json.Unmarshal(resp, &respBody)
 
 	num := 0
+	var adv string
+	var nameList []float64
 	for _, val := range respBody {
-		adv := val["adv"].(string)
+		adv = val["adv"].(string)
 		name := val["name"].(float64)
+		nameList = append(nameList, name)
 		// adv为空 或name为0 不能上传
 		if adv == "" {
 			u.Ctx.WriteString("adv为空，不能上传")
 			return
 		}
-
-		// name 中有3 直接无限次
-		if name == 3 {
-			num = -1
-			goto breakHere
-		}
-
-		//name为1和2 记录num次数 且总次数不能大于5次
-		if name == 1 || name == 2 {
-			advRecord, _ := models.GetAdvRecordByAdvName(adv, name)
-			// 还没有该adv数据 初始化一次 并保存数据库
-			if advRecord == nil {
-				advRec := models.AdvRecord{
-					Adv:      adv,
-					Name:     name,
-					Num:      4,
-					CreateDt: utils.GetCurrentTime(),
-				}
-				if err := models.AddAdvRecord(&advRec); err != nil {
-					u.Ctx.WriteString("Save Database Filed")
-					return
-				}
-				// 第一次上传算一次 所以5次要减掉一次
-				num += 4
-			} else { // 数据库中有该adv 查询num次数
-				if advRecord.Num <= 0 {
-					u.Ctx.WriteString("没有权限不能上传")
-					return
-				} else {
-					// 更新数据库记录
-					num = advRecord.Num - 1
-					if err := models.UpdateAdvRecordByAdvName(adv, name, num); err != nil {
-						u.Ctx.WriteString("Update Database Filed")
-						return
-					}
-
-				}
-			}
-		}
-
 	}
 
-breakHere:
+	//查询记录是否存在
+	advRecord, _ := models.GetAdvRecordByAdvName(adv)
+	// 3在name中 无限次
+	if utils.SearchSlice(nameList, 3) {
+		// 该条数据不存在 就保存
+		num = -1
+		if advRecord == nil {
+			advRec := models.AdvRecord{
+				Adv:      adv,
+				Num:      -1,
+				CreateDt: utils.GetCurrentTime(),
+			}
+			if err := models.AddAdvRecord(&advRec); err != nil {
+				u.Ctx.WriteString("Save Database Filed")
+				return
+			}
+		}
+	} else {
+		// 没有3 就是1或2  该条数据不存在就保存
+		n := len(nameList)
+		if advRecord == nil {
+			num = n*5 - 1
+			advRec := models.AdvRecord{
+				Adv:      adv,
+				Num:      num,
+				CreateDt: utils.GetCurrentTime(),
+			}
+			if err := models.AddAdvRecord(&advRec); err != nil {
+				u.Ctx.WriteString("Save Database Filed")
+				return
+			}
+		} else {
+			// 存在就更新数据
+			num = advRecord.Num - 1
+			if err := models.UpdateAdvRecordByAdvName(adv, num); err != nil {
+				u.Ctx.WriteString("Update Database Filed")
+				return
+			}
+		}
+	}
 
-	// 视频
+	// 上传视频
 	video, videoInfo, err := u.GetFile("video")
 	if err != nil {
 		u.Ctx.WriteString(fmt.Sprintf("%v", err))
@@ -112,6 +114,7 @@ breakHere:
 		u.Ctx.WriteString("请上传符合格式的视频(mp4、avi、mkv、wmv、mov、rm、3gp)")
 		return
 	}
+
 	// 新建文件夹
 	basePath := utils.GetCurrentPath()
 	fmt.Println(basePath)
@@ -122,7 +125,7 @@ breakHere:
 	}
 
 	// 保存视频
-	newVideoName := utils.GetRandomString()
+	newVideoName := utils.GetRandomString(16)
 	videoPath := path.Join(dirPath, newVideoName+"."+layout)
 	err = u.SaveToFile("video", videoPath)
 	if err != nil {
@@ -146,12 +149,13 @@ breakHere:
 			CreateDt:  utils.GetCurrentTime(),
 		}
 
-		// 保存数据库
+		// 保存上传记录
 		if err := models.AddUploadRecord(&uploadVideo); err != nil {
 			u.Ctx.WriteString("Save Database Filed")
 			return
 		}
 
+		//组装返回参数
 		respMap, err := utils.Struct2SSMap(uploadVideo)
 		if err != nil {
 			u.Ctx.WriteString("Struct to map error")
@@ -184,13 +188,14 @@ breakHere:
 			CreateDt:  utils.GetCurrentTime(),
 		}
 
-		// 保存数据库
+		// 保存上传记录
 		if err := models.AddUploadRecord(&uploadVideo); err != nil {
 			u.Ctx.WriteString("Save Database Filed")
 			return
 		}
 
 		defer img.Close()
+		// 组装返回参数
 		respMap, err := utils.Struct2SSMap(uploadVideo)
 		if err != nil {
 			u.Ctx.WriteString("Struct to map error")
@@ -199,6 +204,5 @@ breakHere:
 		respMap["num"] = num
 		u.Data["json"] = respMap
 		u.ServeJSON()
-
 	}
 }

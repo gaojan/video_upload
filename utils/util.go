@@ -6,7 +6,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"path/filepath"
+	"sort"
 	"time"
 )
 
@@ -63,8 +63,7 @@ func PathExists(path string) error {
 }
 
 // 生成随机字符串16位
-func GetRandomString() string {
-	l := 16
+func GetRandomString(l int) string {
 	str := "0123456789abcdefghijklmnopqrstuvwxyz"
 	bytes := []byte(str)
 	var result []byte
@@ -88,17 +87,15 @@ func CopyFile(src, des string) (w int64, err error) {
 		f.Println(err)
 	}
 	defer desFile.Close()
-
 	return io.Copy(desFile, srcFile)
 }
 
-func getFileSize(filename string) int64 {
-	var result int64
-	filepath.Walk(filename, func(path string, f os.FileInfo, err error) error {
-		result = f.Size()
-		return nil
-	})
-	return result
+func SearchSlice(s []float64, x float64) bool {
+	a := sort.SearchFloat64s(s, x)
+	if a > len(s)-1 {
+		return false
+	}
+	return true
 }
 
 //
